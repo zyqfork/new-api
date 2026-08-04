@@ -55,6 +55,18 @@ func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.Rela
 func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.OpenAIResponsesRequest) (any, error) {
 	isCompact := info != nil && info.RelayMode == relayconstant.RelayModeResponsesCompact
 
+	// Generic OpenAI Responses clients (e.g. Pi's openai-responses provider)
+	// embed the system prompt as a system/developer message inside `input`
+	// instead of populating the top-level `instructions` field the way
+	// Codex-native clients do. Hoist it before applying any channel-level
+	// system prompt override below so the two compose the same way they
+	// already do for explicit client-provided instructions.
+	if !isCompact {
+		if err := normalizeResponsesInputInstructions(&request); err != nil {
+			return nil, err
+		}
+	}
+
 	if info != nil && info.ChannelSetting.SystemPrompt != "" {
 		systemPrompt := info.ChannelSetting.SystemPrompt
 
